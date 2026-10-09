@@ -1,12 +1,22 @@
-from fastapi import FastAPI,File, UploadFile, HTTPException
+from fastapi import FastAPI,File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 import boto3
 import os
 from dotenv import load_dotenv
 from schemas.CreateSessionResponse import CreateSessionResponse
 from datetime import datetime, time, timezone
 import tempfile
+import hashlib
+import pandas as pd
+from typing import List
+import logging
+import pprint
+from langchain_core.messages import HumanMessage
+from workflow.BasicWorkFlow import graph
 
-
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 load_dotenv()
 
 app = FastAPI(title="Excel RAG Session API")
@@ -43,24 +53,95 @@ async def upload_document(session_id:str, file: UploadFile = File(...) ):
     if session_id not in SESSION_STORE:
         raise HTTPException(status_code=404, detail="Session not found.")
     
-    # Save the uploaded file temporarily
-    temp_dir = tempfile.gettempdir()
-    temp_file_path = os.path.join(temp_dir,file.filename) #generate a unique temp file name later
-    with open(temp_file_path, "wb") as f:
-        f.write(await file.read())
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    file_hash =  hashlib.sha256(content).hexdigest()[:16]
+    
+    safe_filename = "".join(c for c in file.filename if c.isalnum() or c in ".-=")
     
     # Upload to S3
-    s3_key = f"{session_id}/{file.filename}"
+    file_id=f"file_{file_hash}_{safe_filename}"
+    
+     # Save the uploaded file temporarily
+    temp_dir = tempfile.gettempdir()
+    temp_file_path = os.path.join(temp_dir,file_id) #generate a unique temp file name later
+    with open(temp_file_path, "wb") as f:
+            f.write(content)
+    
+    s3_key = f"{session_id}/{file_id}"
     s3_client.upload_file(temp_file_path, BUCKET_NAME, s3_key)
     
-    # Generate a presigned URL for the uploaded file
     presigned_url = s3_client.generate_presigned_url(
         'get_object',
         Params={'Bucket': BUCKET_NAME, 'Key': s3_key},
         ExpiresIn=3600  # URL valid for 1 hour
     )
+    try:
+            df=pd.read_excel(temp_file_path)
+            columns = list(df.columns)
+            row = df.shape[0]
+            column_type = df.dtypes.astype(str).to_dict()
+            
+            preview = df.head(5).to_dict(orient='records')
+            SESSION_STORE[session_id]={
+                "meta_data":{"row_count":row,"preview":preview,"column_type":column_type,"columns":columns},
+                "s3_url":presigned_url,
+                "file_id":file_id
+            }
+            pprint.pprint(SESSION_STORE[session_id])    
+    except Exception as e:
+        
+        logging.debug(e)
+        raise         
     
     return {"message": "File uploaded successfully.", "presigned_url": presigned_url}
+
+
+@app.websocket("/ws/{session_id}")
+async def test_workflow(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+
+    session_data = SESSION_STORE.get(session_id)
+    if not session_data or not session_data.get("file_id"):
+        await websocket.send_json({"error": "Upload a file for this session before testing the workflow."})
+        await websocket.close(code=1008)
+        return
+
+    messages = []
+    try:
+        while True:
+            payload = await websocket.receive_json()
+            message = payload.get("message") if isinstance(payload, dict) else None
+            if not isinstance(message, str) or not message.strip():
+                await websocket.send_json({"error": "Send a JSON object with a non-empty 'message' string."})
+                continue
+
+            messages.append(HumanMessage(content=message))
+            result = await graph.ainvoke({
+                "session": session_id,
+                "file_id": session_data["file_id"],
+                "file_name": session_data["file_id"],
+                "file_url": session_data["s3_url"],
+                "meta_data": session_data["meta_data"],
+                "messages": messages,
+                "generated_code": None,
+                "execution_result": None,
+                "execution_error": None,
+                "retry_count": 0,
+            })
+            messages = result["messages"]
+            response = next(
+                (item for item in reversed(messages) if getattr(item, "type", None) == "ai"),
+                None,
+            )
+            await websocket.send_json({
+                "message": response.content if response else "Workflow returned no assistant message.",
+            })
+    except WebSocketDisconnect:
+        logging.info("Workflow test websocket disconnected for session %s", session_id)
 
 
 
