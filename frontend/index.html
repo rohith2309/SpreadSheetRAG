@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f7fb">
+    <title>Sheetwise — Spreadsheet assistant</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./config.js"></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="./" aria-label="Sheetwise home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="4" y="3" width="16" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M4 9h16M10 9v12M16 9v12M4 15h16" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+          </span>
+          <span>sheetwise</span>
+        </a>
+
+        <div class="sidebar-section">
+          <p class="eyebrow">WORKSPACE</p>
+          <button class="new-session-button" id="new-session" type="button">
+            <span aria-hidden="true">+</span>
+            New analysis
+          </button>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="privacy-note">
+            <span class="privacy-icon" aria-hidden="true">✳</span>
+            <div>
+              <strong>Your data, in context</strong>
+              <p>Start a session to analyze a spreadsheet.</p>
+            </div>
+          </div>
+          <div class="sidebar-footer">
+            <span class="status-dot"></span>
+            Spreadsheet workspace
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb">
+            <span>Workspace</span>
+            <span class="breadcrumb-divider">/</span>
+            <strong>New analysis</strong>
+          </div>
+          <div class="connection-label"><span class="status-dot"></span> Ready when you are</div>
+        </header>
+
+        <section class="work-area" aria-labelledby="page-title">
+          <div class="welcome">
+            <div class="welcome-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.64 5.64l2.12 2.12m8.48 8.48 2.12 2.12m0-12.72-2.12 2.12m-8.48 8.48-2.12 2.12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/>
+              </svg>
+            </div>
+            <p class="eyebrow">YOUR SPREADSHEET, UNDERSTOOD</p>
+            <h1 id="page-title">Make sense of your data.</h1>
+            <p class="intro">Upload a spreadsheet and ask questions in plain language. Get a little closer to your next insight.</p>
+          </div>
+
+          <section class="upload-card" aria-labelledby="upload-title">
+            <div class="card-heading">
+              <div class="step-number">01</div>
+              <div>
+                <h2 id="upload-title">Start with a spreadsheet</h2>
+                <p>Create a session, then add the file you want to explore.</p>
+              </div>
+            </div>
+
+            <div class="session-row">
+              <div class="session-status" id="session-status" aria-live="polite">
+                <span class="status-dot"></span>
+                <span id="session-label">No active session</span>
+              </div>
+              <button class="button button-primary" id="new-session-main" type="button">
+                Create session
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+
+            <label class="dropzone is-disabled" id="dropzone" for="file-input">
+              <input id="file-input" type="file" accept=".xlsx,.xls" disabled>
+              <span class="upload-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5v3A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span class="dropzone-title" id="upload-title-text">Choose a spreadsheet to upload</span>
+              <span class="dropzone-help" id="upload-help">Excel files · .xlsx or .xls</span>
+            </label>
+            <p class="feedback" id="upload-feedback" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="chat-card is-locked" id="chat-card" aria-labelledby="chat-title">
+            <div class="card-heading chat-heading">
+              <div class="step-number">02</div>
+              <div>
+                <h2 id="chat-title">Ask your spreadsheet</h2>
+                <p id="chat-subtitle">Upload a spreadsheet to start a conversation.</p>
+              </div>
+              <span class="ready-pill" id="file-pill" hidden></span>
+            </div>
+
+            <div class="conversation" id="conversation" aria-live="polite">
+              <div class="empty-chat" id="empty-chat">
+                <span class="chat-sparkle" aria-hidden="true">✳</span>
+                <p>Your conversation starts here.</p>
+                <span>Try asking about trends, totals, or anything unusual in your data.</span>
+              </div>
+            </div>
+
+            <form class="composer" id="chat-form">
+              <label class="sr-only" for="message-input">Ask a question about your spreadsheet</label>
+              <input id="message-input" type="text" placeholder="Ask anything about your data..." autocomplete="off" disabled>
+              <button class="send-button" id="send-button" type="submit" aria-label="Send message" disabled>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </form>
+            <p class="composer-hint">AI can make mistakes. Check important results against your source data.</p>
+          </section>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
