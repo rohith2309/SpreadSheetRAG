@@ -1,5 +1,4 @@
 from fastapi import FastAPI,File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import os
 from dotenv import load_dotenv
@@ -21,21 +20,6 @@ logging.basicConfig(
 load_dotenv()
 
 app = FastAPI(title="Excel RAG Session API")
-FRONTEND_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv(
-        "FRONTEND_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
-    ).split(",")
-    if origin.strip()
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
 
 # S3 & Remote Service Config
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "spread-sheet-repo")
@@ -118,11 +102,6 @@ async def upload_document(session_id:str, file: UploadFile = File(...) ):
 
 @app.websocket("/ws/{session_id}")
 async def test_workflow(websocket: WebSocket, session_id: str):
-    origin = websocket.headers.get("origin")
-    if origin and origin.rstrip("/") not in FRONTEND_ORIGINS and "*" not in FRONTEND_ORIGINS:
-        await websocket.close(code=1008)
-        return
-
     await websocket.accept()
 
     session_data = SESSION_STORE.get(session_id)
