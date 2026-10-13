@@ -31,9 +31,31 @@ function setFeedback(message, kind = "") {
 
 function formatError(error) {
   if (error instanceof TypeError) {
-    return "Could not reach the API. Make sure the backend is running and reload this page.";
+    const origin = window.location.origin;
+    return `Could not reach the API at ${API_BASE_URL}. If the browser blocked the response, add this frontend origin to the backend's FRONTEND_ORIGINS setting: ${origin}`;
   }
   return error.message || "Something went wrong. Please try again.";
+}
+
+function getResponseText(content) {
+  let text = "";
+
+  if (typeof content === "string") {
+    text = content;
+  } else if (Array.isArray(content)) {
+    text = content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part.text === "string") return part.text;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  } else if (content && typeof content.text === "string") {
+    text = content.text;
+  }
+
+  return text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "").trim();
 }
 
 function closeSocket() {
@@ -83,6 +105,14 @@ function setSession(session) {
 }
 
 async function createSession() {
+  if (window.location.protocol === "file:") {
+    setFeedback(
+      "This page is opened as a local file, which browsers block from calling the API. Serve the frontend over HTTP (for example, http://localhost:3000) and allow that origin in the backend's FRONTEND_ORIGINS setting.",
+      "error",
+    );
+    return;
+  }
+
   const buttons = sessionButtons.filter(Boolean);
   buttons.forEach((button) => {
     button.disabled = true;
@@ -188,7 +218,8 @@ function connectAndSend(message) {
       return;
     }
 
-    pendingMessage.textContent = data.error || data.message || "No response was returned.";
+    const responseText = getResponseText(data.error || data.message);
+    pendingMessage.textContent = responseText || "The workflow returned no readable text response.";
     if (data.error) pendingMessage.classList.add("message-error");
     waitingForReply = false;
     updateSendButton();
