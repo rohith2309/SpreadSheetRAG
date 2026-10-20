@@ -1,9 +1,3 @@
-import sys
-import os
-
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from fastapi import FastAPI,File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import boto3
@@ -19,6 +13,7 @@ import logging
 import pprint
 from langchain_core.messages import HumanMessage
 from workflow.BasicWorkFlow import graph
+from utility.GetUniqueval import get_unique_samples
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -31,7 +26,8 @@ FRONTEND_ORIGINS = [
     origin.strip().rstrip("/")
     for origin in os.getenv(
         "FRONTEND_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000",
+        
     ).split(",")
     if origin.strip()
 ]
@@ -106,10 +102,10 @@ async def upload_document(session_id:str, file: UploadFile = File(...) ):
             columns = list(df.columns)
             row = df.shape[0]
             column_type = df.dtypes.astype(str).to_dict()
-            
+            unique = get_unique_samples(df)
             preview = df.head(5).to_dict(orient='records')
             SESSION_STORE[session_id]={
-                "meta_data":{"row_count":row,"preview":preview,"column_type":column_type,"columns":columns},
+                "meta_data":{"row_count":row,"preview":preview,"column_type":column_type,"columns":columns, "unique_vals":unique},
                 "s3_url":presigned_url,
                 "file_id":file_id
             }
@@ -124,6 +120,11 @@ async def upload_document(session_id:str, file: UploadFile = File(...) ):
 
 @app.websocket("/ws/{session_id}")
 async def test_workflow(websocket: WebSocket, session_id: str):
+    logging.info(
+    "WS CONNECTED session=%s metadata_present=%s",
+    session_id,
+    "meta_data" in SESSION_STORE.get(session_id, {})
+    )
     origin = websocket.headers.get("origin")
     if origin and origin.rstrip("/") not in FRONTEND_ORIGINS and "*" not in FRONTEND_ORIGINS:
         await websocket.close(code=1008)
@@ -141,12 +142,24 @@ async def test_workflow(websocket: WebSocket, session_id: str):
     try:
         while True:
             payload = await websocket.receive_json()
+            logging.info("RAW PAYLOAD=%s", payload)
+
             message = payload.get("message") if isinstance(payload, dict) else None
             if not isinstance(message, str) or not message.strip():
                 await websocket.send_json({"error": "Send a JSON object with a non-empty 'message' string."})
                 continue
 
             messages.append(HumanMessage(content=message))
+            logging.info(
+                "QUESTION=%s session=%s",                   
+                message,
+                session_id
+            )
+
+            logging.info(
+                 "METADATA=%s",
+                 session_data.get("meta_data")
+                )
             result = await graph.ainvoke({
                 "session": session_id,
                 "file_id": session_data["file_id"],
@@ -159,6 +172,10 @@ async def test_workflow(websocket: WebSocket, session_id: str):
                 "execution_error": None,
                 "retry_count": 0,
             })
+            logging.info(
+                "GRAPH INPUT META=%s",
+                session_data["meta_data"]["unique_vals"]
+            )
             messages = result["messages"]
             response = next(
                 (item for item in reversed(messages) if getattr(item, "type", None) == "ai"),

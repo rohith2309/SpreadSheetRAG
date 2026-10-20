@@ -4,7 +4,7 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
 
-class FileMetaData:
+class FileMetaData(TypedDict):
     sheetNames : List[str]
     row_count : int
     columns : List[str]
@@ -28,6 +28,3 @@ class AgentState(TypedDict):
     execution_result: Optional[str] 
     execution_error: Optional[str]  
     retry_count: int              
-    
-    
-    

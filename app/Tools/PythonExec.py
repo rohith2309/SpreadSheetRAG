@@ -5,6 +5,13 @@ import boto3
 import os
 from dotenv import load_dotenv
 import json
+import logging
+
+logging.basicConfig(
+    filename="codegen.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 load_dotenv()
 
@@ -26,7 +33,7 @@ def RCEpythonTool(code:str, file_id : Annotated[str,InjectedState("file_id")], f
     if not file_id or not file_url:
         return {"status":"ERROR", "TYPE":"file_url or file_id is None"}
     
-    
+    logging.info( f"code generated : {code}")
     payload={
         "file_id":file_id,
         "file_url":file_url,
