@@ -12,3 +12,4 @@ wheels/
 *package*
 *.zip
 deploy
+*.log
