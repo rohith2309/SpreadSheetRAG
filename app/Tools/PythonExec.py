@@ -23,29 +23,42 @@ lambda_client=boto3.client("lambda",region_name=AWS_REGION, aws_access_key_id=aw
 
 
 @tool
-def RCEpythonTool(code:str, file_id : Annotated[str,InjectedState("file_id")], file_url: Annotated[str,InjectedState("file_url")]) -> dict: 
+def RCEpythonTool(
+    code: str,
+    files: Annotated[dict, InjectedState("files")]
+) -> dict:
     """
-    Executes pandas code inside a remote AWS Lambda worker against the user's Excel file.
-    A pre-loaded DataFrame is accessible as 'df'.
-    Always save the computed answer to a variable named 'result' or print() it.
+    Executes Python pandas code in AWS Lambda and returns stdout or error tracebacks.
+    A dictionary `FILES` is pre-defined in the global environment mapping each filename to its local file path.
+    Example:
+        df = pd.read_excel(FILES['Project-Management-Sample-Data.xlsx'], sheet_name='Sheet1', skiprows=5)
+        print(df.head())
+    Always use print() to output results.
     """
-    
-    if not file_id or not file_url:
-        return {"status":"ERROR", "TYPE":"file_url or file_id is None"}
-    
-    logging.info( f"code generated : {code}")
-    payload={
-        "file_id":file_id,
-        "file_url":file_url,
-        "code":code
+    if not files:
+        return {"status": "ERROR", "error": "No files found in session state."}
+
+    logging.info(f"code generated:\n{code}")
+
+    # Clean mapping of {filename: s3_presigned_url}
+    file_urls = {
+        fname: {
+            "file_id": fdata["file_id"],
+            "s3_url": fdata["s3_url"]
+        }
+        for fname, fdata in files.items()
     }
-    
-    
+
+    payload = {
+        "files": file_urls,
+        "code": code  # Untouched! Line numbers in tracebacks will match 1:1
+    }
+
     response = lambda_client.invoke(
         FunctionName="PythonRCETool",
         InvocationType="RequestResponse",
         Payload=json.dumps(payload)
     )
-    result_payload = json.loads(response["Payload"].read().decode("utf-8"))
-    
-    return result_payload
+    result = json.loads(response["Payload"].read().decode("utf-8"))
+    logging.info(f"Lambda response:\n{json.dumps(result, indent=2, default=str)}")
+    return result
