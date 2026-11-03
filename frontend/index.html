@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f6f7fb">
-    <title>Sheetwise — Spreadsheet assistant</title>
+    <meta name="theme-color" content="#090b0e">
+    <title>Sheetwise — Spreadsheet Analytics Workspace</title>
     <link rel="stylesheet" href="./styles.css">
     <script src="./config.js"></script>
     <script src="./app.js" defer></script>
@@ -15,32 +15,35 @@
         <a class="brand" href="./" aria-label="Sheetwise home">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="3" width="16" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/>
-              <path d="M4 9h16M10 9v12M16 9v12M4 15h16" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M3 9h18M9 9v12M15 9v12M3 15h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
           </span>
-          <span>sheetwise</span>
+          <span class="brand-text">sheetwise</span>
+          <span class="brand-badge">v2</span>
         </a>
 
         <div class="sidebar-section">
-          <p class="eyebrow">WORKSPACE</p>
+          <div class="section-label">WORKSPACE</div>
           <button class="new-session-button" id="new-session" type="button">
-            <span aria-hidden="true">+</span>
-            New analysis
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            <span>New analysis</span>
+            <kbd class="shortcut">N</kbd>
           </button>
         </div>
 
         <div class="sidebar-bottom">
-          <div class="privacy-note">
-            <span class="privacy-icon" aria-hidden="true">✳</span>
-            <div>
-              <strong>Your data, in context</strong>
-              <p>Start a session to analyze a spreadsheet.</p>
+          <div class="system-status-card">
+            <div class="status-indicator-row">
+              <span class="status-dot is-online"></span>
+              <span class="status-title">Runtime Ready</span>
             </div>
+            <p class="status-desc">Isolated Pandas execution sandbox via AWS Lambda.</p>
           </div>
           <div class="sidebar-footer">
-            <span class="status-dot"></span>
-            Spreadsheet workspace
+            <span class="engine-tag">Engine: Bedrock Nova Pro</span>
           </div>
         </div>
       </aside>
@@ -48,32 +51,38 @@
       <main class="main-content">
         <header class="topbar">
           <div class="breadcrumb">
-            <span>Workspace</span>
+            <span class="breadcrumb-item">Console</span>
             <span class="breadcrumb-divider">/</span>
-            <strong>New analysis</strong>
+            <span class="breadcrumb-item">Analytics</span>
+            <span class="breadcrumb-divider">/</span>
+            <strong class="breadcrumb-active" id="topbar-session">Default Session</strong>
           </div>
-          <div class="connection-label"><span class="status-dot"></span> Ready when you are</div>
+          <div class="connection-label">
+            <span class="status-dot is-pulse"></span>
+            <span>Agent Online</span>
+          </div>
         </header>
 
         <section class="work-area" aria-labelledby="page-title">
-          <div class="welcome">
-            <div class="welcome-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none">
-                <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.64 5.64l2.12 2.12m8.48 8.48 2.12 2.12m0-12.72-2.12 2.12m-8.48 8.48-2.12 2.12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/>
-              </svg>
-            </div>
-            <p class="eyebrow">YOUR SPREADSHEET, UNDERSTOOD</p>
-            <h1 id="page-title">Make sense of your data.</h1>
-            <p class="intro">Upload a spreadsheet and ask questions in plain language. Get a little closer to your next insight.</p>
+          <div class="page-header">
+            <h1 id="page-title">Spreadsheet Analytics</h1>
+            <p class="intro">Query, inspect, and analyze multi-sheet Excel files using natural language powered by automated code execution.</p>
           </div>
 
-          <section class="upload-card" aria-labelledby="upload-title">
-            <div class="card-heading">
-              <div class="step-number">01</div>
-              <div>
-                <h2 id="upload-title">Start with a spreadsheet</h2>
-                <p>Create a session, then add the file you want to explore.</p>
+          <!-- Section 01: Data Sources -->
+          <section class="panel upload-card" aria-labelledby="upload-title">
+            <div class="panel-header">
+              <div class="panel-header-left">
+                <div class="panel-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <path d="M22 10H2M10 22V10"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 id="upload-title" class="panel-title">Data Sources</h2>
+                  <p class="panel-subtitle">Upload workbooks to index schemas and enable querying.</p>
+                </div>
               </div>
             </div>
 
@@ -83,52 +92,88 @@
                 <span id="session-label">No active session</span>
               </div>
               <button class="button button-primary" id="new-session-main" type="button">
-                Create session
-                <span aria-hidden="true">→</span>
+                <span>Initialize session</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
               </button>
             </div>
 
             <label class="dropzone is-disabled" id="dropzone" for="file-input">
-              <input id="file-input" type="file" accept=".xlsx,.xls" disabled>
-              <span class="upload-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5v3A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <input id="file-input" type="file" accept=".xlsx,.xls" multiple disabled>
+              <div class="upload-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
                 </svg>
-              </span>
-              <span class="dropzone-title" id="upload-title-text">Choose a spreadsheet to upload</span>
-              <span class="dropzone-help" id="upload-help">Excel files · .xlsx or .xls</span>
+              </div>
+              <span class="dropzone-title" id="upload-title-text">Choose spreadsheets to upload</span>
+              <span class="dropzone-help" id="upload-help">Drop .xlsx or .xls files here, or click to browse</span>
             </label>
+
+            <div class="uploaded-files-list" id="uploaded-files-list" hidden></div>
             <p class="feedback" id="upload-feedback" role="status" aria-live="polite"></p>
           </section>
 
-          <section class="chat-card is-locked" id="chat-card" aria-labelledby="chat-title">
-            <div class="card-heading chat-heading">
-              <div class="step-number">02</div>
-              <div>
-                <h2 id="chat-title">Ask your spreadsheet</h2>
-                <p id="chat-subtitle">Upload a spreadsheet to start a conversation.</p>
+          <!-- Section 02: Query Console -->
+          <section class="panel chat-card is-locked" id="chat-card" aria-labelledby="chat-title">
+            <div class="panel-header">
+              <div class="panel-header-left">
+                <div class="panel-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <polyline points="4 17 10 11 4 5"/>
+                    <line x1="12" y1="19" x2="20" y2="19"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 id="chat-title" class="panel-title">Query Console</h2>
+                  <p id="chat-subtitle" class="panel-subtitle">Upload spreadsheets to begin interactive queries.</p>
+                </div>
               </div>
-              <span class="ready-pill" id="file-pill" hidden></span>
+              <div class="pills-container" id="pills-container">
+                <span class="ready-pill" id="file-pill" hidden></span>
+              </div>
             </div>
 
             <div class="conversation" id="conversation" aria-live="polite">
               <div class="empty-chat" id="empty-chat">
-                <span class="chat-sparkle" aria-hidden="true">✳</span>
-                <p>Your conversation starts here.</p>
-                <span>Try asking about trends, totals, or anything unusual in your data.</span>
+                <div class="empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                    <path d="M7 8h4M7 12h8" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <p class="empty-title">Ready for analysis</p>
+                <span class="empty-desc">Ask specific questions, compute aggregations, or compare data points across sheets.</span>
+                <div class="prompt-chips">
+                  <button type="button" class="prompt-chip" data-prompt="Summarize the structure, row counts, and main columns across all sheets">
+                    <span>Summarize structure & columns</span>
+                  </button>
+                  <button type="button" class="prompt-chip" data-prompt="Find the top 5 highest values and outliers in the dataset">
+                    <span>Find top outliers</span>
+                  </button>
+                  <button type="button" class="prompt-chip" data-prompt="Check for any missing, null, or inconsistent data rows">
+                    <span>Detect null or missing rows</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             <form class="composer" id="chat-form">
-              <label class="sr-only" for="message-input">Ask a question about your spreadsheet</label>
-              <input id="message-input" type="text" placeholder="Ask anything about your data..." autocomplete="off" disabled>
-              <button class="send-button" id="send-button" type="submit" aria-label="Send message" disabled>
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <span class="composer-prefix" aria-hidden="true">></span>
+              <label class="sr-only" for="message-input">Ask a question about your spreadsheets</label>
+              <input id="message-input" type="text" placeholder="Ask a question or request an aggregation..." autocomplete="off" disabled>
+              <button class="send-button" id="send-button" type="submit" aria-label="Execute query" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                 </svg>
               </button>
             </form>
-            <p class="composer-hint">AI can make mistakes. Check important results against your source data.</p>
+            <div class="composer-footer">
+              <span class="composer-hint">Press <kbd>Enter</kbd> to run query. Sandboxed Python Pandas code executes on AWS Lambda.</span>
+            </div>
           </section>
         </section>
       </main>
