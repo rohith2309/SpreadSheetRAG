@@ -12,8 +12,9 @@ from typing import List
 import logging
 import pprint
 from langchain_core.messages import HumanMessage
-from workflow.BasicWorkFlow import graph
+from workflow.workflowExp import expgraph
 from utility.GetUniqueval import get_unique_samples
+from utility.extractSheet import extract_sheet_data
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -83,11 +84,11 @@ async def upload_document(session_id:str, file: UploadFile = File(...) ):
     # Upload to S3
     file_id=f"file_{file_hash}_{safe_filename}"
     
-     # Save the uploaded file temporarily
+    # Save the uploaded file temporarily
     temp_dir = tempfile.gettempdir()
     temp_file_path = os.path.join(temp_dir,file_id) #generate a unique temp file name later
     with open(temp_file_path, "wb") as f:
-            f.write(content)
+        f.write(content)
     
     s3_key = f"{session_id}/{file_id}"
     s3_client.upload_file(temp_file_path, BUCKET_NAME, s3_key)
@@ -98,33 +99,53 @@ async def upload_document(session_id:str, file: UploadFile = File(...) ):
         ExpiresIn=3600  # URL valid for 1 hour
     )
     try:
-            df=pd.read_excel(temp_file_path)
-            columns = list(df.columns)
-            row = df.shape[0]
-            column_type = df.dtypes.astype(str).to_dict()
-            unique = get_unique_samples(df)
-            preview = df.head(5).to_dict(orient='records')
-            SESSION_STORE[session_id]={
-                "meta_data":{"row_count":row,"preview":preview,"column_type":column_type,"columns":columns, "unique_vals":unique},
-                "s3_url":presigned_url,
-                "file_id":file_id
-            }
-            pprint.pprint(SESSION_STORE[session_id])    
-    except Exception as e:
-        
-        logging.debug(e)
-        raise         
+        sheets_peek = extract_sheet_data(temp_file_path)
+
+        columns = []
+        row = 0
+        column_type = {}
+        unique = {}
+        preview = []
+
+        if safe_filename.lower().endswith((".xls", ".xlsx")):
+            with pd.ExcelFile(temp_file_path) as xls:
+                for sheet in xls.sheet_names:
+                    df = pd.read_excel(xls, sheet_name=sheet, header=None, nrows=20)
+                    columns = list(df.columns)
+                    row = df.shape[0]
+                    column_type = df.dtypes.astype(str).to_dict()
+                    unique = get_unique_samples(df)
+                    preview = df.head(5).to_dict(orient="records")
+
+        SESSION_STORE[session_id].setdefault("files", {})
+        SESSION_STORE[session_id]["files"][safe_filename] = {
+            # "meta_data": {
+            #     "row_count": row,
+            #     "preview": preview,
+            #     "column_type": column_type,
+            #     "columns": columns,
+            #     "unique_vals": unique,
+            # },
+            "s3_url": presigned_url,
+            "file_id": file_id,
+            "sheet_names": list(sheets_peek.keys()),
+            "sheets_peek": sheets_peek,
+        }
+        logging.info("======= session info =======")
+        logging.info(SESSION_STORE[session_id]["files"])
+        logging.info("======= session info ENDS =======")
+    except Exception:
+        logging.exception("Upload processing failed")
+        raise
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)         
     
     return {"message": "File uploaded successfully.", "presigned_url": presigned_url}
 
 
 @app.websocket("/ws/{session_id}")
 async def test_workflow(websocket: WebSocket, session_id: str):
-    logging.info(
-    "WS CONNECTED session=%s metadata_present=%s",
-    session_id,
-    "meta_data" in SESSION_STORE.get(session_id, {})
-    )
     origin = websocket.headers.get("origin")
     if origin and origin.rstrip("/") not in FRONTEND_ORIGINS and "*" not in FRONTEND_ORIGINS:
         await websocket.close(code=1008)
@@ -133,50 +154,37 @@ async def test_workflow(websocket: WebSocket, session_id: str):
     await websocket.accept()
 
     session_data = SESSION_STORE.get(session_id)
-    if not session_data or not session_data.get("file_id"):
-        await websocket.send_json({"error": "Upload a file for this session before testing the workflow."})
+    # FIX: Check for "files" dict instead of top-level "file_id"
+    if not session_data or not session_data.get("files"):
+        await websocket.send_json({"error": "Upload at least one file for this session before testing the workflow."})
         await websocket.close(code=1008)
         return
+
+    logging.info("WS CONNECTED session=%s files=%s", session_id, list(session_data["files"].keys()))
 
     messages = []
     try:
         while True:
             payload = await websocket.receive_json()
-            logging.info("RAW PAYLOAD=%s", payload)
-
             message = payload.get("message") if isinstance(payload, dict) else None
             if not isinstance(message, str) or not message.strip():
                 await websocket.send_json({"error": "Send a JSON object with a non-empty 'message' string."})
                 continue
 
             messages.append(HumanMessage(content=message))
-            logging.info(
-                "QUESTION=%s session=%s",                   
-                message,
-                session_id
+            logging.info("QUESTION=%s session=%s", message, session_id)
+
+            # FIX: Pass keys that match AgentStatev2 + recursion_limit for multi-step loops
+            result = await expgraph.ainvoke(
+                {
+                    "session": session_id,
+                    "files": session_data["files"],  # Dynamically reads all uploaded files in session
+                    "messages": messages,
+                },
+                config={"recursion_limit": 25}
             )
 
-            logging.info(
-                 "METADATA=%s",
-                 session_data.get("meta_data")
-                )
-            result = await graph.ainvoke({
-                "session": session_id,
-                "file_id": session_data["file_id"],
-                "file_name": session_data["file_id"],
-                "file_url": session_data["s3_url"],
-                "meta_data": session_data["meta_data"],
-                "messages": messages,
-                "generated_code": None,
-                "execution_result": None,
-                "execution_error": None,
-                "retry_count": 0,
-            })
-            logging.info(
-                "GRAPH INPUT META=%s",
-                session_data["meta_data"]["unique_vals"]
-            )
-            messages = result["messages"]
+            messages = list(result["messages"])
             response = next(
                 (item for item in reversed(messages) if getattr(item, "type", None) == "ai"),
                 None,
